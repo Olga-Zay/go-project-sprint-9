@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -36,23 +37,22 @@ func Worker(in <-chan int64, out chan<- int64) {
 		time.Sleep(1 * time.Millisecond)
 	}
 
-	close(out)
+	defer close(out)
 }
 
 func main() {
 	chIn := make(chan int64)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(1*time.Second, cancel)
-
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
 	// для проверки будем считать количество и сумму отправленных чисел
 	var inputSum int64   // сумма сгенерированных чисел
 	var inputCount int64 // количество сгенерированных чисел
 
 	// генерируем числа, считая параллельно их количество и сумму
 	go Generator(ctx, chIn, func(i int64) {
-		inputSum += i
-		inputCount++
+		atomic.AddInt64(&inputSum, i)
+		atomic.AddInt64(&inputCount, 1)
 	})
 
 	const NumOut = 5 // количество обрабатывающих горутин и каналов
